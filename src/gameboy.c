@@ -1,43 +1,55 @@
 #include "gameboy.h"
 #include "z80gb.h"
 
-int main(void) {
+CPU cpu;
 
-	CPU cpu = (CPU) calloc(sizeof(Sharp_LR35902),1);
-	
+int main(void) {
+		
+	//The processor for this emulation instance
+	Sharp_LR35902 processor;
+	cpu = &processor;
 	//Stack pointer starts at 0xFFFE
 	cpu->sp = 0xFFFE;
 	//Program counter starts at 0x0100
-	cpu->pc = 0x0100;
+	//cpu->pc = 0x0100;
 
 	//Total RAM / mem buffer
 	/*
 	Memory map goes here
 	*/
 	#define RAM cpu->ram
-	RAM = (uint8_t*) calloc(0xFFFF,1);	
+	uint8_t ram[0xFFFF] = {0};
+	RAM = ram;	
 
-	//1 instruction period in nanoseconds; essentially equal to the time it takes for one NOP instruction; default i-period is 
+	//One clock cycle period, 4 of them is one NOP Instruction.
 	double period = ((1.0f / CLOCK_FREQ ) * 1000.0f);
-	printf("period %f\n",period);
 	//cycle count
 	long cyclecount = 0; 
 	//cycle till next execute
 	int cycle = 0;
 
-	//instruction buffer
-	uint8_t op;	
+	//instruction buffer for debugging and mode for scanline modes
+	uint8_t preop = 0, op, mode;
+	uint16_t addr;	
 
 	//Window size
 	uint64_t width = 160, height = 144;		
 	
 	//rom file
-	FILE* rom = fopen("rom", "rb");
+	FILE* ROM = fopen("resources/boot", "rb");
 	//load ROM in mem buffer
-	fread(RAM, 0x3FFF, 1, rom );
+	fread(RAM, 0x3FFF, 1, ROM);
+	fclose(ROM);
+
+	//ram used by ppu
+	//note that these rams also exist within the cpu's ram buffer but are actually shadow copies of the actual ppu ram
+	uint8_t vram[0xFF] = {0};
+	uint8_t oam[0xFF] = {0};
 
 	//log
-	FILE* log = fopen("log","w+b");
+	FILE* log = fopen("log/log","w+b");
+	//memory dump
+	FILE* dump = fopen("log/dump","w+b");
 
 	/*
 
@@ -53,7 +65,6 @@ int main(void) {
 	#define TIMER_SWITCH (IN_EN_REG & 0x04)
 	#define SERIAL_SWITCH (IN_EN_REG & 0x08)
 	#define BUTTON_SWITCH (IN_EN_REG & 0x10)
-
 
 	//Enable all interrupts by default
 	IN_EN_REG = 0xFF;  	
@@ -91,38 +102,48 @@ int main(void) {
 	
 	int debug = 0;	
 	
+	//Nanosecond time structures used for calculating high resolution time deltas
 	struct timespec currtime, lasttime;
-	clock_gettime(CLOCK_MONOTONIC, &lasttime);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &lasttime);
 
 	SDL_Event e;
-	//delta time since last instruction execution
+
+	//delta time of instruction execution
 	long dt_s = 0;
 	//delta time since last frame draw
 	long dv_s = 0;
-	//calibration delta time
-	long dc_s = 0;
-	long cnt = 0;
-	
 
+	//buffer used for logging data
 	char buff[256];
-	
+	//used for correcting from slow instructions
+	long time_stack = 0;
+	long misscnt;
 	while(1){
-		//INPUT EVENTS
-		if(cpu->ime && BUTTON_SWITCH){ 
-			SDL_PollEvent(&e);
-			if(e.type == SDL_QUIT) break;
-		}		
-
-		//DELTA TIME AND CLOCK CALCULATIONS
-		clock_gettime(CLOCK_MONOTONIC, &currtime);
-		dt_s += currtime.tv_nsec - lasttime.tv_nsec;
-		dv_s += currtime.tv_nsec - lasttime.tv_nsec;
-		lasttime.tv_nsec = currtime.tv_nsec;
 		
-		if(dv_s < (70224 * period)) {
+		//SCANLINE RENDER		
+		while(cyclecount < 456){
+			if(cyclecount < 80) mode = 0;
+			//TODO mode 1 is variable based on sprites in vram, fix eventually
+			else if(cyclecount >= 80 && cyclecount < 168) mode = 1;
+			else if(cyclecount >= 168 ) mode = 2; 
+			addr = cpu->pc;
+			op = *(RAM + addr);
+			//INPUT EVENTS
+			if(SDL_PollEvent(&e)){
+				if(e.type == SDL_QUIT) {
+					sprintf(buff, "MISS PERCENTAGE: %f%%\nMISS COUNT: %li\n",(double) misscnt/cyclecount * 100.0, misscnt);
+					fputs(buff,log);
+					break;
+				}
+				if(cpu->ime && BUTTON_SWITCH){ 
+						
+				}
+			}
+
+
 			//EXECUTING
 			//fetch instruction
-			/*op = RAM[cpu->pc];
+			/* op = RAM[cpu->pc];
 			char in;
 			execute:
 			if(debug){
@@ -151,26 +172,64 @@ int main(void) {
 					if(in == 'q') return 1;
 					if(in != 'y') goto execute;
 			}*/
-		
-			cycle = execute(cpu, 0);	
+				
+			//DELTA TIME AND CLOCK CALCULATIONS
+			clock_gettime(CLOCK_MONOTONIC_RAW, &lasttime);
+			cycle = execute();	
+			clock_gettime(CLOCK_MONOTONIC_RAW, &currtime);
+			dt_s = currtime.tv_nsec - lasttime.tv_nsec;
+			//struct timespec t = {0, period * cycle - dt_s};
+			//nanosleep(&t ,NULL);
+			/*if(dt_s <= (long) period * cycle){
+				if(time_stack <= 0){
+					struct timespec t = {0, period * cycle - dt_s};
+					assert(!nanosleep(&t ,NULL));
+				} else if(time_stack - (period * cycle - dt_s) < 0){ 
+					struct timespec t = {0, period * cycle - dt_s - time_stack};
+					time_stack = 0;
+					assert(!nanosleep(&t ,NULL));
+				} else 
+					time_stack -= period * cycle - dt_s;
+			} else {*/
+				misscnt++;
+				sprintf(buff, " \n**\nRegisters:\nBC 0x%x\nDE 0x%x\nHL 0x%x\n(HL) 0x%x\nA 0x%x\nSP 0x%x\n\nFlags:\nZero %u\nSubtract %u\nHalf-Carry %u\nCarry %u\n",
+							cpu->bc,
+							cpu->de,
+							cpu->hl,
+							*(cpu->hl + RAM),
+							(cpu->af & 0xFF00) >> 8,
+							cpu->sp,
+							(cpu->af & 0x0080) >> 7,
+							(cpu->af & 0x0040) >> 6,
+							(cpu->af & 0x0020) >> 5,
+							(cpu->af & 0x0010) >> 4);
+			//time_stack += dt_s - cycle * period; 
+				sprintf(buff + strlen(buff), "ACTUAL dt_s %li TARGET %f DIFFERENCE %f PREV_INSTRUCTION 0x%x INSTRUCTION 0x%x ADDRESS 0x%x TIME_STACK %li\n**\n\n",dt_s, period*cycle, dt_s - cycle * period, preop, op, addr, time_stack);//dt_s);
+				fputs(buff,log);			
+			//}
+			preop = op;
 			cyclecount += cycle;
-			dt_s = 0;
+			//printf("cycles %ld\n", cyclecount);
+		}
+		cyclecount = 0;
+
+		//DRAWING	
+			
+		//OAM SCANNING 		
 		
-		} else {
-			sprintf(buff, "ACTUAL dv_s %li. TARGET %f. DIFFERENCE %f\n",dv_s, period*70224, dv_s - 70224 * period);//dt_s);
-			fputs(buff,log);			
-			//DRAWING		
-			dv_s = 0;
-			SDL_RenderCopy(ren, bg, NULL, rec);
-			//CALIBRATION			
-			//clock_gettime(CLOCK_MONOTONIC, &currtime);
-			//dc_s = (currtime.tv_nsec - lasttime.tv_nsec) / (++cnt);	
-		}		
+				
+		//dv_s = 0;
+		//SDL_RenderCopy(ren, bg, NULL, rec);
 		
 		//draw
 		SDL_RenderPresent(ren);
 	
 	}
+	for(size_t i = 0; i < 0x10000; i++){
+		fputc(cpu->ram[i], dump); 
+	} 
+	fclose(dump);
+	fclose(log);
 	free(rec);	
 	SDL_DestroyTexture(bg);
 	SDL_DestroyRenderer(ren);

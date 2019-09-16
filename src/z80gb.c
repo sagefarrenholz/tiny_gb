@@ -15,11 +15,11 @@ addAr
 */
 
 //CPU struct holds all registers and pointer to ram
-static CPU c;
+//static CPU c;
 
 //Same as c but intended for pointer arithmetic in order to avoid warnings.
-#define uc (uint8_t*) c
-#define uc16 (uint16_t*) c
+//#define uc (uint8_t*) c
+//#define uc16 (uint16_t*) c
 
 /*
 ENDIANESS:
@@ -46,7 +46,7 @@ n Address		n Adress+1
 */
 
 //Register values and pointer to ram being used
-#define RAM (c->ram)	
+/*#define RAM (c->ram)	
 #define PC (c->pc)
 #define SP (c->sp)
 #define AF (c->af)
@@ -76,7 +76,7 @@ n Address		n Adress+1
 
 #define CARRY_SET AF |= 0x0010
 #define CARRY_RESET AF &= 0xFFEF
-
+*/
 /*
 
  [==========]
@@ -86,10 +86,10 @@ n Address		n Adress+1
 */
 
 //Switch IME ON
-void ei(){
+/*void ei(){
 	c->ime = 1;
 }
-
+*/
 /*
 
  [===================]
@@ -109,7 +109,7 @@ void ei(){
 >---------------------<
 
 */
-
+/*
 //load
 void ld(uint8_t* dest, uint8_t* src) {
 	*dest = *src;
@@ -119,7 +119,7 @@ void ld(uint8_t* dest, uint8_t* src) {
 void ld16(uint16_t* dest, uint16_t* src){
 	*dest = *src;
 }
-
+*/
 /*
 NOTE:
 Conflicting documentation on zero flag effect
@@ -128,7 +128,7 @@ zero flag is always reset while others
 say it can act as defined.
 */
 //rotate left 
-void rlc(uint8_t* dest){
+/*void rlc(uint8_t* dest){
 	//Normal bit rotation left. Bit 7 is copied into carry flag.
 	uint8_t car = *dest & 0x80;
 	if(car) CARRY_SET; else CARRY_RESET;
@@ -278,7 +278,7 @@ void jp(uint16_t* dest) {
 void jr(int8_t* offset){
 	PC += *offset;
 }
-
+*/
 /*
 
  [====]
@@ -286,9 +286,9 @@ void jr(int8_t* offset){
  [====]
 
 */
-
+/*
 uint8_t* reg(uint8_t reg_val){
-	/*
+	
 	Register maps:
 	0: B 
 	1: C
@@ -300,14 +300,14 @@ uint8_t* reg(uint8_t reg_val){
 	7: A
 	*/
 	//if reg_val == 6 return the addr of value at HL
-	if(reg_val == 6) return RAM + HL;
+	/*if(reg_val == 6) return RAM + HL;
 	//view gameboy.h for why pointer is advanced certain amounts
 	uint8_t map[8] = {1, 0, 3, 2, 5, 4, 0, 9};
 	return uc + map[reg_val];
 }
-
+*/
 //register pair map 1
-uint16_t* rp(uint8_t reg_val){
+//uint16_t* rp(uint8_t reg_val){
 	/*
 	Register pair map with stack pointer:
 	0: BC
@@ -315,11 +315,11 @@ uint16_t* rp(uint8_t reg_val){
 	2: HL
 	3: SP
 	*/
-	return uc16+reg_val*2u;	
-}
+	//return uc16+reg_val*2u;	
+//}
 
 //register pair map 2
-uint16_t* rp2(uint8_t reg_val){
+//uint16_t* rp2(uint8_t reg_val){
 	/*
 	Register pair map with accumulator and flag pair:
 	0: BC
@@ -327,8 +327,8 @@ uint16_t* rp2(uint8_t reg_val){
 	2: HL
 	3: AF
 	*/
-	return reg_val==3 ? &AF : uc16+reg_val*2u;	
-}
+	//return reg_val==3 ? &AF : uc16+reg_val*2u;	
+//}
 
 /*
 
@@ -337,7 +337,7 @@ uint16_t* rp2(uint8_t reg_val){
  [==========]
 
 */
-void alu(uint8_t operation, uint8_t* src){
+//void alu(uint8_t operation, uint8_t* src){
 	/*
 	Arithmetic map
 	0: ADD
@@ -349,7 +349,7 @@ void alu(uint8_t operation, uint8_t* src){
 	6: OR
 	7: CP
 	*/
-	switch(operation){
+/*	switch(operation){
 		case 0:
 			add(A, src);
 			break;
@@ -397,7 +397,7 @@ void alu(uint8_t operation, uint8_t* src){
 			break;
 	}
 } 
-
+*/
 /*
 
  [==================]
@@ -407,7 +407,7 @@ void alu(uint8_t operation, uint8_t* src){
 */
 
 //check condition held in y
-uint8_t con(uint8_t condition){
+//uint8_t con(uint8_t condition){
 	/*
 	Condition map
 	0: Zero flag 0 / Disabled
@@ -415,7 +415,7 @@ uint8_t con(uint8_t condition){
 	2: Carry flag 0 / Disabled
 	3: Carry flag 1 / Enabled
 	*/
-	uint8_t result = 0;
+/*	uint8_t result = 0;
 	switch(condition){
 		//Not Zero?
 		case 0:
@@ -438,7 +438,8 @@ uint8_t con(uint8_t condition){
 		
 	}
 	return result;
-}
+*/
+////////////////}
 
 /*
 
@@ -448,29 +449,29 @@ uint8_t con(uint8_t condition){
 
 */
 //return
-void ret(){
+//void ret(){
 	//Goto address at last in of stack then increment the stack by 2 bytes.
-	PC=*(uint16_t*)(RAM + SP);	
-	SP+=2;
-}
+//	PC=*(uint16_t*)(RAM + SP);	
+//	SP+=2;
+//}
 //pop word / 2bytes off stack into register pair
-void pop(uint16_t* rp){
-	*rp = *(uint16_t*)(RAM + SP);
-	SP+=2;
-}
+//void pop(uint16_t* rp){
+//	*rp = *(uint16_t*)(RAM + SP);
+//	SP+=2;
+//}
 
 //decrement stack pointer by 2 bytes and set the 2 bytes equal to register pair
-void push(uint16_t* rp){
-	SP-=2;
-	*(uint16_t*)(RAM+SP) = *rp;
-}
+//void push(uint16_t* rp){
+//	SP-=2;
+//	*(uint16_t*)(RAM+SP) = *rp;
+//}
 
 //push address of next instruction onto stack then jump to instruction
-void call(uint16_t* dest){
-	uint16_t temp_addr = PC+1;
-	push(&temp_addr);
-	jp(dest);
-}
+//void call(uint16_t* dest){
+//	uint16_t temp_addr = PC+1;
+//	push(&temp_addr);
+//	jp(dest);
+//}
 
 /*
 
@@ -481,13 +482,13 @@ void call(uint16_t* dest){
 */
 
 
-int execute(CPU cpu, uint8_t prefixed){
+inline int execute(){
 	//These declarations are at the top of the page.
-	c = cpu;
+	//c = cpu;
 
 	//OPERANDS
-	//n is the byte following the opcode, nn is two bytes following the opcode LSB, d a signed byte following the opcode
-	#define n (uint8_t*) RAM + PC + 1
+	//n is a pointer to the byte following the opcode, nn a pointer to the two bytes following the opcode LSB, d is a pointer to the signed byte following the opcode
+	#define n (RAM + PC + 1)
 	#define nn (uint16_t*)n
 	#define d (int8_t*)n	
 
@@ -501,30 +502,46 @@ int execute(CPU cpu, uint8_t prefixed){
 	https://gb-archive.github.io/salvage/decoding_gbz80_opcodes/Decoding%20Gamboy%20Z80%20Opcodes.html
 	*/
 
-	#define x ((*(RAM + PC)  & 0xC0) >> 6) 			//7-6 bits; C0 Mask 1100 0000
+	#define x ((*(RAM + PC) & 0xC0) >> 6) 			//7-6 bits; C0 Mask 1100 0000
 	#define y ((*(RAM + PC) & 0x38) >> 3)			//5-3 bits; 38 Mask 0011 1000 
-	#define z ((*(RAM + PC) & 0x07))				//2-0 bits; 07 Mask 0000 0111
+	#define z ((*(RAM + PC) & 0x07))			//2-0 bits; 07 Mask 0000 0111
 	#define p (y >> 1)					//y(5-4 bits)
-	#define q (y % 2)						//y(3 bit)
+	#define q (y % 2)					//y(3 bit)
 
 	//temp d variable used to prevent bad access to high byte; also used by PREFIX OPCODE
 	int16_t temp_d = (int16_t) *d;
 	//rst define used to reference restarts for RST command
 	#define rst ((uint16_t*) RAM + (y * 8))
 	
-	if(prefixed){
+	if(cpu->prefixed){
+		cpu->prefixed = 0;
 		switch(x){
+			//ROT
 			case 0:
+				PC++;
+				return 8; 
 				break;
+			//BIT TEST
 			case 1:
+				SUB_RESET;
+				HALF_SET;
+				if()
+				PC++;
+				return 8;
 				break;
+			//BIT RESET
 			case 2:
+				PC++;
+				return 8;
 				break;
-			case 4:
+			//BIT SET
+			case 4:	
+				PC++;
+				return 8;
 				break;
 		}
 	}
-
+	//Set this instruction as the previously executed opcode
 	switch (x) {
 		//x is 0
 		case 0:
@@ -539,13 +556,14 @@ int execute(CPU cpu, uint8_t prefixed){
 						
 						//LD (nn), SP; 0x08; load value at address nn into stack pointer
 						case 1:
-						ld16(&SP,(uint16_t*) RAM + (*nn));		
+						ld16(&SP,nn);		
 						PC+=3;
 						return 20;
 						break;
 						
 						//STOP; 0x10;
 						case 2: 	
+						return 10;
 						break;
 						
 						//JR d; 0x18; relative jump
@@ -557,8 +575,8 @@ int execute(CPU cpu, uint8_t prefixed){
 						//JR cc, n; 0x20 NZ, 0x28 Z, 0x30 NC, 0x38 C; relative jump based on condition
 						default:
 						if(con(y-4)) jr(d);
-						else PC++;
-						return 8;
+						else {PC+=2; return 8;}
+						return 12;
 						break;
 					}
 				case 1:
@@ -832,7 +850,8 @@ int execute(CPU cpu, uint8_t prefixed){
 						case 2:
 						case 3:
 							if(con(y)) jp(nn);
-							return 12;
+							else {PC+=3; return 12;}
+							return 16;
 							break;
 						case 4:
 							ld(RAM+*C+0xFF00,A);
@@ -840,7 +859,7 @@ int execute(CPU cpu, uint8_t prefixed){
 							return 8;
 							break;
 						case 5:
-							ld(RAM+*nn,A);
+							ld(RAM+*(nn),A);
 							PC+=3;
 							return 16;
 							break;
@@ -850,7 +869,7 @@ int execute(CPU cpu, uint8_t prefixed){
 							return 8;
 							break;
 						case 7:
-							ld(A, RAM+*nn);
+							ld(A, RAM+*(nn));
 							PC+=3;
 							return 16;
 							break;
@@ -859,23 +878,25 @@ int execute(CPU cpu, uint8_t prefixed){
 				case 3:
 					switch(y){
 						case 0:
-							jp(nn);
+							jp((nn));
 							return 16;
 							break;
 						case 1:
 							//PREFIX
 							PC++;
-							temp_d = execute(c, 1);
-							return temp_d + 4;
+							cpu->prefixed = 1;
+							return 4;
 							break;
 						case 6: 
 							//DISABLE INTERUPTS
 							c->ime = 0;
+							PC++;
 							return 4;
 							break;
 						case 7:
 							//ENABLE INTERRUPTS
 							c->ime = 0xFF;
+							PC++;
 							return 4;
 							break;
 						default:
@@ -891,6 +912,7 @@ int execute(CPU cpu, uint8_t prefixed){
 						case 2:
 						case 3:
 							if(con(y)) {call(nn); return 24;}
+							PC++;
 							return 12;
 							break;
 						default:
@@ -920,10 +942,13 @@ int execute(CPU cpu, uint8_t prefixed){
 					return 8; 
 					break;
 				case 7:
-					//RESTART
-					call(rst);
-					return 16;
-					break;
+					{
+						//RESTART
+						uint16_t temp = y*8;
+						call(&temp);
+						return 16;
+						break;
+					}
 			}	
 		break;	//case 3 x break
 	}	

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <SDL2/SDL.h>
 #include <stddef.h>
+#include <assert.h>
 
 #if defined(__APPLE__) || (__gnu_linux__)
 #include <time.h>
@@ -24,6 +25,8 @@ af,             //accumulator + flags
 pc;             //program counter
 uint8_t* ram;	//pointer to ram 
 uint8_t ime;	//interupt master enable flag, if != 0 then all interrupt bits enabled in 0xFFFF are enabled.
+uint8_t lcdc;	//lcd control register
+uint8_t prefixed;	//previously executed opcode
 } Sharp_LR35902;
 
 #endif
