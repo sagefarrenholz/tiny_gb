@@ -17,7 +17,6 @@ int main(void) {
 	/*
 	Memory map goes here
 	*/
-	#define RAM cpu->ram
 	uint8_t ram[0xFFFF] = {0};
 	RAM = ram;	
 
@@ -35,11 +34,13 @@ int main(void) {
 	//Window size
 	uint64_t width = 160, height = 144;		
 	
-	//rom file
-	FILE* ROM = fopen("resources/boot", "rb");
-	//load ROM in mem buffer
-	fread(RAM, 0x3FFF, 1, ROM);
-	fclose(ROM);
+	//BOOTLOADER
+	FILE* BOOT = fopen("resources/boot", "rb");
+	//load bootloader into ram
+	fread(RAM, 0x3FFF, 1, BOOT);
+	fclose(BOOT);
+
+	//ROM 
 
 	//ram used by ppu
 	//note that these rams also exist within the cpu's ram buffer but are actually shadow copies of the actual ppu ram
@@ -119,59 +120,33 @@ int main(void) {
 	long time_stack = 0;
 	long misscnt;
 	while(1){
+		SDL_PollEvent(&e);
+		//User has quit.
+		if(e.type == SDL_QUIT) {
+			sprintf(buff, "MISS PERCENTAGE: %f%%\nMISS COUNT: %li\n",(double) misscnt/cyclecount * 100.0, misscnt);
+			fputs(buff,log);
+			break;
+		}
+		//Button has been pressed. Input interrupt is enabled.
+		if(cpu->ime && BUTTON_SWITCH){ 
+				
+		}
 		
-		//SCANLINE RENDER		
+		//SCANLINE RENDER
 		while(cyclecount < 456){
-			if(cyclecount < 80) mode = 0;
-			//TODO mode 1 is variable based on sprites in vram, fix eventually
-			else if(cyclecount >= 80 && cyclecount < 168) mode = 1;
-			else if(cyclecount >= 168 ) mode = 2; 
+			SDL_PollEvent(&e);
+
+			//Scanning OAM for sprites that share pixels at this coordinate
+			if(cyclecount < 80) mode = 2;
+			
+			//Picture Generation Step, TODO mode 1 is variable based on sprites in vram, fix eventually
+			else if(cyclecount >= 80 && cyclecount < 168) mode = 3;
+			
+			//Horizontal Blanking Period
+			else if(cyclecount >= 168 ) mode = 0; 
+			
 			addr = cpu->pc;
 			op = *(RAM + addr);
-			//INPUT EVENTS
-			if(SDL_PollEvent(&e)){
-				if(e.type == SDL_QUIT) {
-					sprintf(buff, "MISS PERCENTAGE: %f%%\nMISS COUNT: %li\n",(double) misscnt/cyclecount * 100.0, misscnt);
-					fputs(buff,log);
-					break;
-				}
-				if(cpu->ime && BUTTON_SWITCH){ 
-						
-				}
-			}
-
-
-			//EXECUTING
-			//fetch instruction
-			/* op = RAM[cpu->pc];
-			char in;
-			execute:
-			if(debug){
-				printf("\nCycle counter: %zu\n", cyclecount);	
-				printf("Time since last instruction in us: %i\n", dt_s);
-				printf("Max distance from perfect time: %i\n", dt_s - (period * (cycle/4)));
-				printf("Instruction address: 0x%x\n", cpu->pc);
-				printf("The last in address, of stack: 0x%x\n\n", cpu->sp);
-				printf("Opcode to be executed: 0x%x\n", op);
-					printf("y for next instruction, i for cpu readout, s to end debugging, or q to quit\n");
-					scanf(" %c",&in);
-					if(in == 'i') { 
-						printf(" \nRegisters:\nBC 0x%x\nDE 0x%x\nHL 0x%x\n(HL) 0x%x\nA 0x%x\n\nFlags:\nZero %u\nSubtract %u\nHalf-Carry %u\nCarry %u\n",
-							cpu->bc,
-							cpu->de,
-							cpu->hl,
-							*(cpu->hl + RAM),
-							(cpu->af & 0xFF00) >> 8,
-							(cpu->af & 0x0080) >> 7,
-							(cpu->af & 0x0040) >> 6,
-							(cpu->af & 0x0020) >> 5,
-							(cpu->af & 0x0010) >> 4);
-						goto execute;
-					}	
-					if(in == 's') debug = 0; 
-					if(in == 'q') return 1;
-					if(in != 'y') goto execute;
-			}*/
 				
 			//DELTA TIME AND CLOCK CALCULATIONS
 			clock_gettime(CLOCK_MONOTONIC_RAW, &lasttime);
@@ -191,7 +166,7 @@ int main(void) {
 				} else 
 					time_stack -= period * cycle - dt_s;
 			} else {*/
-				misscnt++;
+				//misscnt++;
 				sprintf(buff, " \n**\nRegisters:\nBC 0x%x\nDE 0x%x\nHL 0x%x\n(HL) 0x%x\nA 0x%x\nSP 0x%x\n\nFlags:\nZero %u\nSubtract %u\nHalf-Carry %u\nCarry %u\n",
 							cpu->bc,
 							cpu->de,
@@ -204,12 +179,11 @@ int main(void) {
 							(cpu->af & 0x0020) >> 5,
 							(cpu->af & 0x0010) >> 4);
 			//time_stack += dt_s - cycle * period; 
-				sprintf(buff + strlen(buff), "ACTUAL dt_s %li TARGET %f DIFFERENCE %f PREV_INSTRUCTION 0x%x INSTRUCTION 0x%x ADDRESS 0x%x TIME_STACK %li\n**\n\n",dt_s, period*cycle, dt_s - cycle * period, preop, op, addr, time_stack);//dt_s);
+			sprintf(buff + strlen(buff), "ACTUAL dt_s %li TARGET %f DIFFERENCE %f PREV_INSTRUCTION 0x%x INSTRUCTION 0x%x ADDRESS 0x%x TIME_STACK %li CYCLE_COUNT %li\n**\n\n",dt_s, period*cycle, dt_s - cycle * period, preop, op, addr, time_stack, cyclecount);
 				fputs(buff,log);			
 			//}
 			preop = op;
 			cyclecount += cycle;
-			//printf("cycles %ld\n", cyclecount);
 		}
 		cyclecount = 0;
 
@@ -225,9 +199,9 @@ int main(void) {
 		SDL_RenderPresent(ren);
 	
 	}
-	for(size_t i = 0; i < 0x10000; i++){
+	/*for(size_t i = 0; i < 0x10000; i++){
 		fputc(cpu->ram[i], dump); 
-	} 
+	} */
 	fclose(dump);
 	fclose(log);
 	free(rec);	

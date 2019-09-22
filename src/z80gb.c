@@ -516,8 +516,43 @@ inline int execute(){
 	if(cpu->prefixed){
 		cpu->prefixed = 0;
 		switch(x){
-			//ROT
+			//Rotation, Shift, and Swap commands
 			case 0:
+				switch(y){
+					case 0:
+						//Rotate register left
+						rlc(reg(z));
+						break;
+					case 1:
+						//Rotate register right
+						rrc(reg(z));
+						break;
+					case 2:
+						//Rotate register left through carry
+						rl(reg(z));
+						break;
+					case 3:
+						//Rotate register right through carry
+						rr(reg(z));
+						break;
+					case 4:
+						//Shift carry left, low bit zeroed
+						sl(reg(z));
+						break;
+					case 5:
+						//Shift carry right, high bit zeroed
+						sr(reg(z));
+						break;
+					case 6:
+						//Swap high and low nibbles of a register
+						swp(reg(z));
+						break;
+					case 7:
+						//Shift carry right, high bit remains same
+						srl(reg(z));
+						break;
+
+				}
 				PC++;
 				return 8; 
 				break;
@@ -525,17 +560,20 @@ inline int execute(){
 			case 1:
 				SUB_RESET;
 				HALF_SET;
-				if()
+				ZERO_SET;
+				if(*reg(z) & (1 << y)) ZERO_RESET; 
 				PC++;
 				return 8;
 				break;
 			//BIT RESET
 			case 2:
+				*reg(z) &= ~(1 << y);
 				PC++;
 				return 8;
 				break;
 			//BIT SET
 			case 4:	
+				*reg(z) &= (1 << y);
 				PC++;
 				return 8;
 				break;

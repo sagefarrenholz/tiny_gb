@@ -84,7 +84,7 @@ Number of cpu clock cycles. NOT machine cycles.
 Notes:
 Program counter will likely change values.
 */
-int execute(uint8_t instruction);
+int execute();
 
 /*
 
@@ -184,6 +184,46 @@ static inline void rr(uint8_t* dest){
 	ZERO_RESET;
 	*dest >>= 1;
 	*dest |= (carry << 7);
+}
+
+//shift right into carry, highest bit remains same
+static inline void sr(uint8_t* dest){
+	HALF_RESET;
+	SUB_RESET;
+	ZERO_RESET;
+	uint8_t msb = *dest & 0x80;
+	if(*dest & 0x01) CARRY_SET; else CARRY_RESET;
+	*dest >>= 1;
+	*dest |= msb;
+}
+
+//shift right into carry, highest bit is zeroed
+static inline void srl(uint8_t* dest){
+	HALF_RESET;
+	SUB_RESET;
+	ZERO_RESET;
+	if(*dest & 0x01) CARRY_SET; else CARRY_RESET;
+	*dest >>= 1;
+}
+
+//shift left into carry, lowest bit is zeroed
+static inline void sl(uint8_t* dest){
+	HALF_RESET;
+	SUB_RESET;
+	ZERO_RESET;
+	if(*dest & 0x80) CARRY_SET; else CARRY_RESET;
+	*dest <<= 1;
+}
+
+//swap the high and low nibble of a byte
+static inline void swp(uint8_t* dest){
+	if(!*dest) ZERO_SET;
+	HALF_RESET;
+	SUB_RESET;
+	CARRY_RESET;
+	uint8_t hn = *dest & 0xF0;
+	*dest = (*dest << 4) & hn;
+
 }
 
 //increment
