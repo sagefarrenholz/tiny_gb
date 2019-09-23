@@ -260,14 +260,14 @@ inline int execute(){
 							return 4;
 							break;
 						case 1:
-							//rla; 0x17; rotate a left through carry
-							rl(A);
+							//rrca; 0x0F; rotate a right
+							rrc(A);
 							PC+=1;
 							return 4;
 							break;
 						case 2:
-							//rrca; 0x0F; rotate a right
-							rrc(A);
+							//rla; 0x17; rotate a left through carry
+							rl(A);
 							PC+=1;
 							return 4;
 							break;

@@ -29,14 +29,27 @@ int main(void) {
 
 	//Window size
 	uint64_t width = 160, height = 144;		
-	
+
+	//ROM
+	FILE* ROM = fopen("resources/mario.rom","rb");
+	//load rom, except lowest 256 bytes into memory
+	fread(RAM, 0xFFFF, 1, ROM);
+
 	//BOOTLOADER
 	FILE* BOOT = fopen("resources/boot", "rb");
 	//load bootloader into ram
 	fread(RAM, 0x3FFF, 1, BOOT);
 	fclose(BOOT);
 
-	//ROM 
+
+	/*
+	 * Upon powering up the gameboy runs a 256 byte bootloader program, this program is situated within the first
+	 * 0xFF bytes of memory, before the program finishes it writes to a special register that allows the lower 
+	 * 256 of bytes of the cartridge to replace it in memorty.
+	 *
+	 * This program plays the Nintendo Logo intro, as well as a few other miscallaneous functions like checking
+	 * if the game is pirated.
+	 */
 
 	//ram used by ppu
 	//note that these rams also exist within the cpu's ram buffer but are actually shadow copies of the actual ppu ram
@@ -128,7 +141,7 @@ int main(void) {
 				
 		}
 	
-		if(PC>100)return 0;
+		if(PC>0xff)return 0;
 
 		//SCANLINE RENDER
 		while(cyclecount < 456){

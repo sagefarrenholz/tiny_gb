@@ -515,7 +515,7 @@ static inline void push(uint16_t* rp){
 
 //push address of next instruction onto stack then jump to instruction
 static inline void call(uint16_t* dest){
-	uint16_t temp_addr = PC+1;
+	uint16_t temp_addr = PC+3;
 	push(&temp_addr);
 	jp(dest);
 }
