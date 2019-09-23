@@ -1,4 +1,3 @@
-implement rotation instructions 
 implement graphics
 fix zero_reset on rot and shift ops
 add 16 cycle timings (hl) for prefixed opcodes

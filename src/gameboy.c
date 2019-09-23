@@ -8,10 +8,6 @@ int main(void) {
 	//The processor for this emulation instance
 	Sharp_LR35902 processor;
 	cpu = &processor;
-	//Stack pointer starts at 0xFFFE
-	cpu->sp = 0xFFFE;
-	//Program counter starts at 0x0100
-	//cpu->pc = 0x0100;
 
 	//Total RAM / mem buffer
 	/*
@@ -131,11 +127,16 @@ int main(void) {
 		if(cpu->ime && BUTTON_SWITCH){ 
 				
 		}
-		
+	
+		if(PC>100)return 0;
+
 		//SCANLINE RENDER
 		while(cyclecount < 456){
 			SDL_PollEvent(&e);
 
+			//Bypasses zeroing loop
+			//if(HL == 0x9fff) HL =  0x8001;
+			
 			//Scanning OAM for sprites that share pixels at this coordinate
 			if(cyclecount < 80) mode = 2;
 			
@@ -168,16 +169,16 @@ int main(void) {
 			} else {*/
 				//misscnt++;
 				sprintf(buff, " \n**\nRegisters:\nBC 0x%x\nDE 0x%x\nHL 0x%x\n(HL) 0x%x\nA 0x%x\nSP 0x%x\n\nFlags:\nZero %u\nSubtract %u\nHalf-Carry %u\nCarry %u\n",
-							cpu->bc,
-							cpu->de,
-							cpu->hl,
+							BC,
+							DE,
+							HL,
 							*(cpu->hl + RAM),
-							(cpu->af & 0xFF00) >> 8,
-							cpu->sp,
-							(cpu->af & 0x0080) >> 7,
-							(cpu->af & 0x0040) >> 6,
-							(cpu->af & 0x0020) >> 5,
-							(cpu->af & 0x0010) >> 4);
+							*A,
+							SP,
+							ZERO,
+							SUB,
+							HALF,
+							CARRY);
 			//time_stack += dt_s - cycle * period; 
 			sprintf(buff + strlen(buff), "ACTUAL dt_s %li TARGET %f DIFFERENCE %f PREV_INSTRUCTION 0x%x INSTRUCTION 0x%x ADDRESS 0x%x TIME_STACK %li CYCLE_COUNT %li\n**\n\n",dt_s, period*cycle, dt_s - cycle * period, preop, op, addr, time_stack, cyclecount);
 				fputs(buff,log);			

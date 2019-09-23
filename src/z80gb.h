@@ -47,23 +47,23 @@ n Address		n Adress+1
 #define C uc
 
 //Flag values, retrieve flag values
-#define ZERO (AF & 0x0080 >> 7)
-#define SUB (AF & 0x0040 >> 6)
-#define HALF (AF & 0x0020 >> 5)
-#define CARRY (AF & 0x0010 >> 4)
+#define ZERO ((AF & 0x0080) >> 7)
+#define SUB ((AF & 0x0040) >> 6)
+#define HALF ((AF & 0x0020) >> 5)
+#define CARRY ((AF & 0x0010) >> 4)
 
 //Flag switches, these are all masks used for flipping flag bits in flag register
-#define ZERO_SET AF |= 0x0080
-#define ZERO_RESET AF &= 0xFF7F 
+#define ZERO_SET (AF |= 0x0080)
+#define ZERO_RESET (AF &= 0xFF7F) 
 
-#define SUB_SET  AF |= 0x0040
-#define SUB_RESET AF &= 0xFFBF
+#define SUB_SET  (AF |= 0x0040)
+#define SUB_RESET (AF &= 0xFFBF)
 
-#define HALF_SET AF |= 0x0020
-#define HALF_RESET AF &= 0xFFDF
+#define HALF_SET (AF |= 0x0020)
+#define HALF_RESET (AF &= 0xFFDF)
 
-#define CARRY_SET AF |= 0x0010
-#define CARRY_RESET AF &= 0xFFEF
+#define CARRY_SET (AF |= 0x0010)
+#define CARRY_RESET (AF &= 0xFFEF)
 
 /*
 
@@ -71,18 +71,11 @@ Summary:
 execute() simulates the executing cycles of
 the gameboy's z80 processor. It manipulates the
 input processor's registers and the input ram so 
-as to perform the action of the instruction parameter.
-
-Paramaters:
-cpu: pointer to z80 struct containing registers.
-ram: pointer to ram structure.
-instruction: byte instruction to be executed.
+as to perform the action of the next instruction.
 
 Return value:
 Number of cpu clock cycles. NOT machine cycles.
 
-Notes:
-Program counter will likely change values.
 */
 int execute();
 
@@ -94,7 +87,7 @@ int execute();
  
 */
 
-//Switch IME ON
+//Switch IME ON, ime is master interrupt switch. 
 static inline void ei(){
 	c->ime = 1;
 }
@@ -325,6 +318,8 @@ static inline void jp(uint16_t* dest) {
 
 //relative jump
 static inline void jr(int8_t* offset){
+	//Address must be advanced by two to represent the relative jump from the beginning of the next instructions address.
+	PC += 2;
 	PC += *offset;
 }
 
@@ -364,7 +359,7 @@ static inline uint16_t* rp(uint8_t reg_val){
 	2: HL
 	3: SP
 	*/
-	return uc16 + reg_val*2u;	
+	return uc16 + reg_val;	
 }
 
 //register pair map 2
@@ -376,7 +371,7 @@ static inline uint16_t* rp2(uint8_t reg_val){
 	2: HL
 	3: AF
 	*/
-	return reg_val==3 ? &AF : uc16+reg_val*2u;	
+	return reg_val==3 ? &AF : uc16+reg_val;	
 }
 
 /*
@@ -464,29 +459,26 @@ static inline uint8_t con(uint8_t condition){
 	2: Carry flag 0 / Disabled
 	3: Carry flag 1 / Enabled
 	*/
-	uint8_t result = 0;
+	uint8_t ret = 0;
 	switch(condition){
 		//Not Zero?
 		case 0:
-		 	if(!(AF & 0x0080)) result = 1;
+		 	if(!(ZERO)) return 1;
 			break;
 		//Zero?
 		case 1:
-			if(AF & 0x0080) result = 1;
+			if(ZERO) return 1;
 			break;
 		//Not Carry?
 		case 2:
-			if(!(AF & 0x0010)) result = 1;
+			if(!(CARRY)) return 1;
 			break;
 		//Carry?
 		case 3:
-			if(AF & 0x0010) result = 1;
+			if(CARRY) return 1;
 			break;
-		default: 
-			return 0;
-		
 	}
-	return result;
+	return 0;
 }
 
 /*
@@ -496,6 +488,13 @@ static inline uint8_t con(uint8_t condition){
  [==================]
 
 */
+
+/*
+	Note:
+	The stack grows down on the gameboy. Whenever a push occurs,
+       	the stack pointer decrements rather than incrementing.
+*/
+
 //return
 static inline void ret(){
 	//Goto address at last in of stack then increment the stack by 2 bytes.
