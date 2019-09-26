@@ -3,6 +3,8 @@
 
 CPU cpu;
 
+void render();
+
 int main(void) {
 		
 	//The processor for this emulation instance
@@ -71,15 +73,16 @@ int main(void) {
 	//Interrupts Enable Register and each switch
 	#define IN_EN_REG *(RAM+0xFFFF)
 	#define VBLANK_SWITCH (IN_EN_REG & 0x01)
-	#define LCD_SWITCH (IN_EN_REG & 0x02)
+	#define LCDC_SWITCH (IN_EN_REG & 0x02)
 	#define TIMER_SWITCH (IN_EN_REG & 0x04)
 	#define SERIAL_SWITCH (IN_EN_REG & 0x08)
 	#define BUTTON_SWITCH (IN_EN_REG & 0x10)
 
-	//Enable all interrupts by default
-	IN_EN_REG = 0xFF;  	
-	//Enable interrupt master switch
-	cpu->ime = 0xFF;
+	//TODO, figure out what interrupts are on by default
+	//DISABLE all interrupts by default
+	IN_EN_REG = 0x00;  	
+	//DISABLE interrupt master switch
+	cpu->ime = 0x00;
 	
 	SDL_Window* win;
 	SDL_Renderer* ren;
@@ -128,36 +131,96 @@ int main(void) {
 	//used for correcting from slow instructions
 	long time_stack = 0;
 	long misscnt;
+
+	//RENDERING & EXECUTION VARIABLES
+	//Execution loop cycle count, differs depending on whether vblanking or not
+	int loop_count = 456;
+	//Last address written to DMA Transfer register
+	uint8_t last_dma = 0x00;
+
+	LCDC_STATUS_MODE(1);
+
+	uint8_t* framebuffer = (uint8_t*) malloc(144*160);
+
+	//Data used during OAM reading stage for determing which sprites to render
+	uint8_t sprite_count = 0;
+	uint8_t* sprite_array[10]; 
+
 	while(1){
-		SDL_PollEvent(&e);
-		//User has quit.
-		if(e.type == SDL_QUIT) {
-			sprintf(buff, "MISS PERCENTAGE: %f%%\nMISS COUNT: %li\n",(double) misscnt/cyclecount * 100.0, misscnt);
-			fputs(buff,log);
-			break;
-		}
-		//Button has been pressed. Input interrupt is enabled.
-		if(cpu->ime && BUTTON_SWITCH){ 
-				
-		}
-	
-		if(PC>0xff)return 0;
+		//EXECUTION LOOP
+		while(cyclecount < loop_count){
 
-		//SCANLINE RENDER
-		while(cyclecount < 456){
+			//Poll for events, ie button presses.
 			SDL_PollEvent(&e);
+			
+			//META INTERRUPTS
+				//QUIT TINY_GB
+				if(e.type == SDL_QUIT) {
+					sprintf(buff, "MISS PERCENTAGE: %f%%\nMISS COUNT: %li\n",(double) misscnt/cyclecount * 100.0, misscnt);
+					fputs(buff,log);
+					return 0;
+				}				
 
-			//Bypasses zeroing loop
+
+			//GAMEBOY INTERRUPT ROUTINES
+			//Only run interrupt routines if IME is enabled via EI instruction. 
+			if(IME){
+				//LCDC STATUS - PRIORITY 2
+				if(LCDC_SWITCH){
+					if(/*LCDC compare to LY */0)
+					PC = 0x48;
+				}
+
+
+				//TIMER OVERFLOW - PRIORITY 3
+				if(TIMER_SWITCH){
+					if(/*timer overflows*/0);
+				}
+
+				//SERIAL TRANSFER - PRIORITY 4
+
+				//INPUT - PRIORITY 5
+			}
+
+			//DMA TRANSFER, 0xFF used to signify not written to
+			if(DMA != 0xFF){
+				memcpy(RAM + 0xFF00, RAM + (DMA << 8), 0x9F);
+				DMA = 0xFF;
+			}	
+
+			//Bypasses boot zeroing loop, memory and registers already zeroed
 			//if(HL == 0x9fff) HL =  0x8001;
 			
-			//Scanning OAM for sprites that share pixels at this coordinate
-			if(cyclecount < 80) mode = 2;
-			
-			//Picture Generation Step, TODO mode 1 is variable based on sprites in vram, fix eventually
-			else if(cyclecount >= 80 && cyclecount < 168) mode = 3;
-			
-			//Horizontal Blanking Period
-			else if(cyclecount >= 168 ) mode = 0; 
+			//If not vblanking, switch rendering modes accordingly
+			if(LCDC_STATUS_MODE_GET != 1){
+				//Scanning OAM for sprites that share pixels at this coordinate
+				if(cyclecount < 80) {
+					LCDC_STATUS_MODE(2);
+					sprite_count = 0;
+					for(int i = 0; i <= 0x9f && sprite_count < 10; i+4){
+						//object at this address
+						uint8_t* temp_obj = RAM + (0xFE00 | i);
+						uint8_t y = temp_obj[0];
+						uint8_t x = temp_obj[1];
+						uint8_t w = 8, h;
+						if(LCDC_OBJ_SIZE) h = 16; else h = 8;
+						//Not being drawn, out of bounds
+						if(!x || x >= 168) continue;  
+						if(y + h <= 16 || y + h >= 144) continue; 
+						//INTERSECTS LINE
+						if(LINE > y
+							
+					}
+				}
+
+				//Picture Generation Step, TODO mode 1 is variable based on sprites in vram, fix eventually
+				else if(cyclecount >= 80 && cyclecount < 168) {
+					LCDC_STATUS_MODE(3);
+				}
+
+				//Horizontal Blanking Period
+				else if(cyclecount >= 168 ) LCDC_STATUS_MODE(0); 
+			}
 			
 			addr = cpu->pc;
 			op = *(RAM + addr);
@@ -199,23 +262,47 @@ int main(void) {
 			preop = op;
 			cyclecount += cycle;
 		}
+		
+		//LINE STEPPER
+		//Increment the scanline that is being rendered
+		if(LINE < 143) {
+			//Increment LCDC register (LCD Y Coordinated), the line to be rendered
+			LINE++;
+			//Normal line: set mode initially to mode 2. 
+			LCDC_STATUS_MODE(2);
+			loop_count = 456;
+
+			//Set coincidence bit for the scanline to be rendered. 
+			if(LYC == LINE) 
+				LCDC_STATUS_COINCIDENCE(1);
+			else 
+				LCDC_STATUS_COINCIDENCE(0);
+
+		//VBLANK, display buffered frame, and reset to top line
+		} else {
+			LINE = 0;
+			//VBLANK: set mode to 1
+			LCDC_STATUS_MODE(1);
+			//Loop count is set to length of vblank period in cycles
+			loop_count = 4560;
+			//If VBLANK Interrupt is enabled, activate vblank interrupt routine
+			if(IME && VBLANK_SWITCH)
+				PC = 0x40;
+
+			//DISPLAY BUFFERED FRAME HERE
+			SDL_RenderPresent(ren);
+		}
+
+		//Reset cycles used for this execution loop (either VBLANK or SCANLINE RENDER).
 		cyclecount = 0;
 
-		//DRAWING	
-			
-		//OAM SCANNING 		
-		
-				
 		//dv_s = 0;
 		//SDL_RenderCopy(ren, bg, NULL, rec);
-		
-		//draw
-		SDL_RenderPresent(ren);
-	
 	}
 	/*for(size_t i = 0; i < 0x10000; i++){
 		fputc(cpu->ram[i], dump); 
 	} */
+	//CLEANUP
 	fclose(dump);
 	fclose(log);
 	free(rec);	
@@ -223,4 +310,11 @@ int main(void) {
 	SDL_DestroyRenderer(ren);
 	SDL_DestroyWindow(win);
 	return 0;
+}
+
+void render(){
+
+	
+
+
 }

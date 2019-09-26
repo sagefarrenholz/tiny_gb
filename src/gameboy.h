@@ -5,6 +5,7 @@
 #include <SDL2/SDL.h>
 #include <stddef.h>
 #include <assert.h>
+#include <string.h>
 
 #if defined(__APPLE__) || (__gnu_linux__)
 #include <time.h>

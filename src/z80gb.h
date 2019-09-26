@@ -65,6 +65,34 @@ n Address		n Adress+1
 #define CARRY_SET (AF |= 0x0010)
 #define CARRY_RESET (AF &= 0xFFEF)
 
+#define IME (c->ime)
+
+//Important registers held in memory
+//LCDC - 0xFF40 - Controlling rendering and the screen
+#define LCDC (*(RAM+0xFF40))
+#define LCDC_OBJ_SIZE ((LCDC & 0x04) >> 2) 
+
+
+//LCDC STATUS  - 0xFF41 - Status of LCD and related interrupts
+#define LCDC_STATUS (*(RAM+0xFF41))
+//SET COMPARE BIT
+#define LCDC_STATUS_COINCIDENCE(C) (LCDC_STATUS &= (0x0FB | (C << 2)))
+//SET MODE BITS
+#define LCDC_STATUS_MODE(M) (LCDC_STATUS &= (0xFC | M))
+//GET MODE BITS
+#define LCDC_STATUS_MODE_GET (LCDC_STATUS & 0x04)
+
+//LY - 0xFF44 - Current line to be rendered - Read only
+#define LINE (*(RAM+0xFF44))
+
+//LYC - 0xFF45 - Used for comparing against LY
+#define LYC (*(RAM+0xFF45))
+
+
+
+//DMA - 0xFF56 - Transfer memory chunk from XX00 - XX9F to FE00-FE9F (OAM MEMORY)
+#define DMA (*(RAM+0xFF56))
+
 /*
 
 Summary:
