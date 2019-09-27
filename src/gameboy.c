@@ -191,36 +191,66 @@ int main(void) {
 			//Bypasses boot zeroing loop, memory and registers already zeroed
 			//if(HL == 0x9fff) HL =  0x8001;
 			
-			//If not vblanking, switch rendering modes accordingly
-			if(LCDC_STATUS_MODE_GET != 1){
-				//Scanning OAM for sprites that share pixels at this coordinate
-				if(cyclecount < 80) {
-					LCDC_STATUS_MODE(2);
-					sprite_count = 0;
-					for(int i = 0; i <= 0x9f && sprite_count < 10; i+4){
-						//object at this address
-						uint8_t* temp_obj = RAM + (0xFE00 | i);
-						uint8_t y = temp_obj[0];
-						uint8_t x = temp_obj[1];
-						uint8_t w = 8, h;
-						if(LCDC_OBJ_SIZE) h = 16; else h = 8;
-						//Not being drawn, out of bounds
-						if(!x || x >= 168) continue;  
-						if(y + h <= 16 || y + h >= 144) continue; 
-						//INTERSECTS LINE
-						if(LINE > y
-							
-					}
+			//These routines run when the rendering mode changes
+			//OAM SCANNING - MODE 2
+			if(cyclecount < 80 && LCDC_STATUS_MODE_GET == 1 && loop_count == 456) {
+				LCDC_STATUS_MODE(2);
+				sprite_count = 0;
+				/*
+				 * This loop traverses the OAM table and adds sprites to the sprite_array which
+				 * is used for rendering during MODE 3. It starts at address FE00 and moves to
+				 * address FE9f. i increments by 4 because each entry is 4 bytes wide. The first
+				 * two bytes are position y and x respsectively of each entry. 
+				 */
+				for(int i = 0; i <= 0x9f && sprite_count < 10; i+4){
+					//object at this address
+					uint8_t* temp_obj = RAM + (0xFE00 | i);
+					uint8_t y = temp_obj[0];
+					uint8_t x = temp_obj[1];
+					uint8_t w = 8, h;
+					if(LCDC_OBJ_SIZE) h = 16; else h = 8;
+					//Not being drawn, out of bounds
+					if(!x || x >= 168) continue;  
+					if(y + h <= 16 || y >= 160) continue; 
+					//If it intersects line then add it to draw list and increment sprite_count 
+					if(LINE + 8 >= y && LINE + 8 <= y + (h - 1))
+						sprite_array[sprite_count++] = temp_obj;
+						
 				}
-
-				//Picture Generation Step, TODO mode 1 is variable based on sprites in vram, fix eventually
-				else if(cyclecount >= 80 && cyclecount < 168) {
-					LCDC_STATUS_MODE(3);
-				}
-
-				//Horizontal Blanking Period
-				else if(cyclecount >= 168 ) LCDC_STATUS_MODE(0); 
 			}
+			//SCANLINE RENDERING - MODE 3
+			else if(cyclecount >= 80 && LCDC_STATUS_MODE_GET == 2) {
+				LCDC_STATUS_MODE(3);
+				while(sprite_count > 0){
+					uint8_t* curr_obj = sprite_array[--sprite_count];
+					int y = curr_obj[0];
+					int x = curr_obj[1];
+					int h;
+					//Note, 4 pixels per byte. Sprites are 2 bytes across
+					if(LCDC_OBJ_SIZE) h = 16; else h = 8;
+					//Location of this sprite in memory
+					uint8_t* loc = RAM + 0x8000 + curr_obj[2];
+					//Which pallete is being used 0 - 0xFF48, 1 - 0xFF49
+					uint8_t pal = *(RAM + 0xFF48 + ((curr_obj[3] & 0x80) >> 3));
+					//Starting row byte on the sprite
+					uint8_t* sprite_row = loc + ((LINE - y) * 2);
+					//Starting bit in first byte of the sprite and last bit to write
+					uint8_t start = x - 8 >= 0 ? x - 8 : 0;
+					uint8_t end = x + 7 >= 168 ? 168 - x : 15;
+					//Starting byte in frame buffer
+					uint8_t* idx = (int) start/4;
+					//Stream bits into framebuffer
+					for(int i = 0; i < 2; i++){
+						//TODO, add x and y flip
+						//Copy color from tile map to frame bufferman in me
+						idx = framebuffer + (LINE * 40) + (int8_t) (x - 8) / 4; 
+					}
+					
+				}			
+			}
+
+			//HBLANK - MODE 0
+			else if(cyclecount >= 168 && LCDC_STATUS_MODE_GET == 3) LCDC_STATUS_MODE(0); 
 			
 			addr = cpu->pc;
 			op = *(RAM + addr);
@@ -268,8 +298,6 @@ int main(void) {
 		if(LINE < 143) {
 			//Increment LCDC register (LCD Y Coordinated), the line to be rendered
 			LINE++;
-			//Normal line: set mode initially to mode 2. 
-			LCDC_STATUS_MODE(2);
 			loop_count = 456;
 
 			//Set coincidence bit for the scanline to be rendered. 
