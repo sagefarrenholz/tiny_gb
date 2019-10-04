@@ -193,7 +193,7 @@ int main(void) {
 			//If the DMA register is written to in RAM then perform a DMA memory transfer
 			//DMA TRANSFER, 0xFF used to signify not written to
 			if(DMA != 0xFF){
-				memcpy(RAM + 0xFF00, RAM + (DMA << 8), 0x9F);
+				memcpy(RAM + 0xFE00, RAM + (DMA << 8), 0x9F);
 				DMA = 0xFF;
 			}	
 
