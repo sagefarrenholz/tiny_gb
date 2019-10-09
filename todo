@@ -1,6 +1,7 @@
 implement graphics
 fix zero_reset on rot and shift ops
 add 16 cycle timings (hl) for prefixed opcodes
+fix bitwise operation coincidence bit
 
 not important:
 add in ability to switch palettes

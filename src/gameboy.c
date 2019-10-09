@@ -29,20 +29,20 @@ int main(void) {
 	uint8_t preop = 0, op, mode;
 	uint16_t addr;	
 
+	PC = 0x100;
 	//Window size
 	uint64_t width = 160, height = 144;		
 
 	//ROM
 	FILE* ROM = fopen("resources/mario.rom","rb");
 	//load rom, except lowest 256 bytes into memory
-	fread(RAM, 0xFFFF, 1, ROM);
+	//fread(RAM, 0x7FFF, 1, ROM);
 
 	//BOOTLOADER
 	FILE* BOOT = fopen("resources/boot", "rb");
 	//load bootloader into ram
 	fread(RAM, 0x3FFF, 1, BOOT);
 	fclose(BOOT);
-
 
 	/*
 	 * Upon powering up the gameboy runs a 256 byte bootloader program, this program is situated within the first
@@ -115,7 +115,6 @@ int main(void) {
 	SDL_Texture* bg = SDL_CreateTextureFromSurface(ren, sur);
 	printf("%s", SDL_GetError());
 	
-
 	int debug = 0;	
 	
 	//Nanosecond time structures used for calculating high resolution time deltas
@@ -139,7 +138,7 @@ int main(void) {
 	//Execution loop cycle count, differs depending on whether vblanking or not
 	int loop_count = 456;
 	//Last address written to DMA Transfer register
-	uint8_t last_dma = 0xFF;
+	DMA = 0xFF;
 
 	LCDC_STATUS_MODE(1);
 
@@ -152,6 +151,7 @@ int main(void) {
 
 	//Rendering Color Palette, lightest to darkest
 	uint32_t palette[4] = {0xff9bbc0f, 0xff8bac0f, 0xff306230, 0xff0f380f};
+	//uint32_t palette[4] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
 	//for(int i = 0; i < 160*144; i++) framebuffer[i] = palette[0];
 
 	while(1){
@@ -211,9 +211,10 @@ int main(void) {
 				 * address FE9f. i increments by 4 because each entry is 4 bytes wide. The first
 				 * two bytes are position y and x respsectively of each entry. 
 				 */
-				for(int i = 0; i <= 0x9f && sprite_count < 10; i+4){
+				for(int i = 0; i <= 0x9f && sprite_count < 10; i+=4){
 					//object at this address
 					uint8_t* temp_obj = RAM + (0xFE00 | i);
+					if(!temp_obj[2]) continue;
 					uint8_t y = temp_obj[0];
 					uint8_t x = temp_obj[1];
 					uint8_t w = 8, h;
@@ -230,10 +231,8 @@ int main(void) {
 			//SCANLINE RENDERING - MODE 3
 			else if(cyclecount >= 80 && LCDC_STATUS_MODE_GET == 2) {
 				LCDC_STATUS_MODE(3);
-				/*
-				Background rendering loop here.
-				*/
-				
+					
+			
 				//SPRITE RENDERING
 				while(sprite_count > 0){
 					/*
@@ -279,7 +278,7 @@ int main(void) {
 			}
 
 			//HBLANK - MODE 0
-			else if(cyclecount >= 168 && LCDC_STATUS_MODE_GET == 3) LCDC_STATUS_MODE(0); 
+			else if(cyclecount >= 168 && LCDC_STATUS_MODE_GET == 3) {LCDC_STATUS_MODE(0);}
 			
 			addr = cpu->pc;
 			op = *(RAM + addr);
@@ -348,11 +347,9 @@ int main(void) {
 
 			//DISPLAY BUFFERED FRAME HERE
 			//Lock frame texture, allows framebuffer to be copied to texture.
-			//SDL_LockTexture(frame, NULL, (void**) &(framebuffer), &pitch);
-			//SDL_UnlockTexture(frame);
-			SDL_RenderClear(ren);
-			SDL_UpdateTexture(frame, NULL, framebuffer, width*4);
-			SDL_RenderCopy(ren, frame, NULL, rec);
+			//SDL_RenderClear(ren);
+			SDL_UpdateTexture(frame, NULL, framebuffer, width);
+			SDL_RenderCopy(ren, frame, NULL, NULL);
 			SDL_RenderPresent(ren);
 		}
 

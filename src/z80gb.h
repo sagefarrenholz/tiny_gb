@@ -75,12 +75,19 @@ n Address		n Adress+1
 
 //LCDC STATUS  - 0xFF41 - Status of LCD and related interrupts
 #define LCDC_STATUS (*(RAM+0xFF41))
+//LCDC STATUS Display Sprites, 1 = Display, 0 = Do not display 
+#define LCDC_STATUS_SPRITES (LCDC_STATUS & 0x2) >> 1
+//LCDC STATUS BG Tile Map Select
+#define LCDC_STATUS_BG_MAP (LCDC_STATUS & 0x8) >> 3
+//LCDC STATUS Tile Data Select
+#define LCDC_STATUS_TILE_DATA (LCDC_STATUS & 0x10) >> 4
 //SET COMPARE BIT
+//TODO FIX THIS OPERATION, should not be an and operation. Will only set if bit is already active
 #define LCDC_STATUS_COINCIDENCE(C) (LCDC_STATUS &= (0x0FB | (C << 2)))
 //SET MODE BITS
-#define LCDC_STATUS_MODE(M) (LCDC_STATUS &= (0xFC | M))
+#define LCDC_STATUS_MODE(M) LCDC_STATUS |= 0x3; LCDC_STATUS &= (0xFC | M)
 //GET MODE BITS
-#define LCDC_STATUS_MODE_GET (LCDC_STATUS & 0x04)
+#define LCDC_STATUS_MODE_GET (LCDC_STATUS & 0x03)
 
 //LY - 0xFF44 - Current line to be rendered - Read only
 #define LINE (*(RAM+0xFF44))
