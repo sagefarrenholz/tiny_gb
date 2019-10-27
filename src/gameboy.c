@@ -29,9 +29,10 @@ int main(void) {
 	uint8_t preop = 0, op, mode;
 	uint16_t addr;	
 
-	PC = 0x100;
+	//PC = 0x100;
 	//Window size
 	uint64_t width = 160, height = 144;		
+	uint64_t pitch = width*4;
 
 	//ROM
 	FILE* ROM = fopen("resources/mario.rom","rb");
@@ -89,31 +90,6 @@ int main(void) {
 
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_CreateWindowAndRenderer(width, height, 0, &win, &ren);	
-
-	uint32_t rmask, gmask, bmask, amask;
-
-	#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-    		rmask = 0xff000000;
-    		gmask = 0x00ff0000;
-    		bmask = 0x0000ff00;
-    		amask = 0x000000ff;
-	#else
-    		rmask = 0x000000ff;
-    		gmask = 0x0000ff00;
-    		bmask = 0x00ff0000;
-    		amask = 0xff000000;
-	#endif
-    	SDL_Surface* sur = SDL_CreateRGBSurface(0, width, height, 32,
-                                   rmask, gmask, bmask, amask);	
-	
-		
-
-	SDL_Rect* rec = (SDL_Rect*) calloc(sizeof(SDL_Rect),1);
-	*rec = (SDL_Rect){0,0,width,height};
-
-	SDL_FillRect(sur, NULL, SDL_MapRGB(sur->format, 255,0,0));	
-	SDL_Texture* bg = SDL_CreateTextureFromSurface(ren, sur);
-	printf("%s", SDL_GetError());
 	
 	int debug = 0;	
 	
@@ -142,17 +118,20 @@ int main(void) {
 
 	LCDC_STATUS_MODE(1);
 
-	uint32_t* framebuffer = (uint32_t*) malloc(160*144);
+	//Allocate a framebuffer, each pixel is 4 bytes (32 bit-depth w/ alpha)
+	uint32_t* framebuffer = (uint32_t*) malloc(160*144*4);
 	SDL_Texture* frame = SDL_CreateTexture(ren, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, width, height);
+	printf("%s", SDL_GetError());
 
 	//Data used during OAM reading stage for determing which sprites to render
 	uint8_t sprite_count = 0;
 	uint8_t* sprite_array[10]; 
 
-	//Rendering Color Palette, lightest to darkest
-	uint32_t palette[4] = {0xff9bbc0f, 0xff8bac0f, 0xff306230, 0xff0f380f};
-	//uint32_t palette[4] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
-	//for(int i = 0; i < 160*144; i++) framebuffer[i] = palette[0];
+	//Rendering Color Palette, lightest to darkest!
+	//ORIGINAL
+	//uint32_t palette[4] = {0xff9bbc0f, 0xff8bac0f, 0xff306230, 0xff0f380f};
+	//MONOCHROME
+	uint32_t palette[4] = {0xffffffff, 0xffb6b6b6, 0xff676767, 0xff000000};
 
 	while(1){
 		//EXECUTION LOOP
@@ -193,6 +172,7 @@ int main(void) {
 			//If the DMA register is written to in RAM then perform a DMA memory transfer
 			//DMA TRANSFER, 0xFF used to signify not written to
 			if(DMA != 0xFF){
+				printf("DMA");
 				memcpy(RAM + 0xFE00, RAM + (DMA << 8), 0x9F);
 				DMA = 0xFF;
 			}	
@@ -202,7 +182,7 @@ int main(void) {
 			
 			//These routines run only once when the rendering mode changes
 			//OAM SCANNING - MODE 2
-			if(cyclecount < 80 && LCDC_STATUS_MODE_GET == 1 && loop_count == 456) {
+			if(cyclecount < 80 && (LCDC_STATUS_MODE_GET == 1 || LCDC_STATUS_MODE_GET == 0) && loop_count == 456) {
 				LCDC_STATUS_MODE(2);
 				sprite_count = 0;
 				/*
@@ -218,23 +198,45 @@ int main(void) {
 					uint8_t y = temp_obj[0];
 					uint8_t x = temp_obj[1];
 					uint8_t w = 8, h;
+					printf("Sprite collected: Address %x Position %u %u\n",temp_obj,x,y);
 					if(LCDC_OBJ_SIZE) h = 16; else h = 8;
 					//Not being drawn, out of bounds
 					if(!x || x >= 168) continue;  
 					if(y + h <= 16 || y >= 160) continue; 
 					//If it intersects line then add it to draw list and increment sprite_count 
-					if(LINE + 8 >= y && LINE + 8 <= y + (h - 1))
+					if(LINE + 8 >= y && LINE + 8 <= y + (h - 1)){
 						sprite_array[sprite_count++] = temp_obj;
+					}
 						
 				}
 			}
 			//SCANLINE RENDERING - MODE 3
 			else if(cyclecount >= 80 && LCDC_STATUS_MODE_GET == 2) {
 				LCDC_STATUS_MODE(3);
-					
+				
+				//BG RENDERING
+				uint8_t* bg_map = LCDC_STATUS_BG_MAP ? RAM+0x9C00 : RAM+0x9800;
+				uint8_t* bg_tile = LCDC_STATUS_TILE_DATA ? RAM+0x8000 : RAM+0x8800; 
+				
+				uint8_t pix, col;
+				//BG_PAL = 0xE1;	
+				
+				//Note that the parent loop is counting in bytes not pixels
+				for(int u = 0; u < 160/4; u++){
+					for(int i = 0; i < 4; i++){
+						//Pixel value at this position
+						pix = (bg_tile[u+LINE*160] >> ((3 - i) * 2)) & 0x3;
+						//printf("pix %x",pix);
+						col = (BG_PAL >> (pix * 2)) & 0x3;
+						//Copy corresponding color into framebuffer at current pixel x + i.
+						framebuffer[LINE*160 + u*4 + i] = palette[col];
+					}
+				}				
 			
 				//SPRITE RENDERING
 				while(sprite_count > 0){
+					
+					printf("Sprite 1: Address %x Position %u %u\n",sprite_array[0],sprite_array[0][0],sprite_array[0][1]);
 					/*
 					This loop copies sprites from vram into the frame buffer for rendering.
 					Each 2 bit pixel value is translated from its corresponding palette then
@@ -255,6 +257,7 @@ int main(void) {
 					//Pixel value and associated color value
 					uint8_t pixel, color;
 					//Each sprite is two bytes wide so the byte rendering loop occurs twice per row
+					//FIX VARIABLE NAMES HERE
 					for(int i = 0; i < 2; i++){
 						byte += i;
 						//This loop renders over every in-the-bounds pixel
@@ -269,7 +272,7 @@ int main(void) {
 							//Color value lookup, takes value at pixel and translates it using its palette
 							//Color of 0 valued pixels is always 0: transparent, go to next pixel.
 							if(!pixel) continue; 	
-							else color = (pal >> (i * 2)) & 0x3;
+							else color = (pal >> (pixel * 2)) & 0x3;
 							//Copy corresponding color into framebuffer at current pixel x + i.
 							framebuffer[x + i + LINE * 160] = palette[color];
 						}
@@ -325,7 +328,8 @@ int main(void) {
 		//Increment the scanline that is being rendered
 		if(LINE < 143) {
 			//Increment LCDC register (LCD Y Coordinated), the line to be rendered
-			LINE++;
+			//if statement ensures first line is rendered
+			if(loop_count == 456) LINE++;
 			loop_count = 456;
 
 			//Set coincidence bit for the scanline to be rendered. 
@@ -345,10 +349,13 @@ int main(void) {
 			if(IME && VBLANK_SWITCH)
 				PC = 0x40;
 
+			//SCALING FUNCTION
+			
+
 			//DISPLAY BUFFERED FRAME HERE
 			//Lock frame texture, allows framebuffer to be copied to texture.
-			//SDL_RenderClear(ren);
-			SDL_UpdateTexture(frame, NULL, framebuffer, width);
+			SDL_LockTexture(frame,NULL,(void**)&framebuffer,(int*)&pitch);
+			SDL_UnlockTexture(frame);
 			SDL_RenderCopy(ren, frame, NULL, NULL);
 			SDL_RenderPresent(ren);
 		}
@@ -358,18 +365,17 @@ int main(void) {
 
 		//dv_s = 0;
 	}
-	/*for(size_t i = 0; i < 0x10000; i++){
+	for(size_t i = 0; i < 0x10000; i++){
 		fputc(cpu->ram[i], dump); 
-	} */
+	} 
 	//CLEANUP
 	fclose(dump);
 	fclose(log);
-	free(rec);	
 	free(framebuffer);
-	SDL_DestroyTexture(bg);
 	SDL_DestroyTexture(frame);
 	SDL_DestroyRenderer(ren);
 	SDL_DestroyWindow(win);
+	SDL_Quit();
 	return 0;
 }
 

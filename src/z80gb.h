@@ -89,6 +89,13 @@ n Address		n Adress+1
 //GET MODE BITS
 #define LCDC_STATUS_MODE_GET (LCDC_STATUS & 0x03)
 
+//BG PALETTE
+#define BG_PAL *(RAM+0xFF47)
+
+//BG SCROLL REGISTERS
+#define SCX *(RAM+0xFF42)
+#define SCY *(RAM+0xFF43)
+
 //LY - 0xFF44 - Current line to be rendered - Read only
 #define LINE (*(RAM+0xFF44))
 
