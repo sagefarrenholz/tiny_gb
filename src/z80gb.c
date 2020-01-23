@@ -9,7 +9,7 @@
 */
 
 
-inline int execute(){
+int execute(){
 
 	//OPERANDS
 	//n is a pointer to the byte following the opcode, nn a pointer to the two bytes following the opcode LSB, d is a pointer to the signed byte following the opcode
@@ -29,9 +29,9 @@ inline int execute(){
 
 	#define x ((*(RAM + PC) & 0xC0) >> 6) 			//7-6 bits; C0 Mask 1100 0000
 	#define y ((*(RAM + PC) & 0x38) >> 3)			//5-3 bits; 38 Mask 0011 1000 
-	#define z ((*(RAM + PC) & 0x07))			//2-0 bits; 07 Mask 0000 0111
-	#define p (y >> 1)					//y(5-4 bits)
-	#define q (y % 2)					//y(3 bit)
+	#define z ((*(RAM + PC) & 0x07))				//2-0 bits; 07 Mask 0000 0111
+	#define p (y >> 1)								//y(5-4 bits)
+	#define q (y % 2)								//y(3 bit)
 
 	//temp d variable used to prevent bad access to high byte; also used by PREFIX OPCODE
 	int16_t temp_d = (int16_t) *d;

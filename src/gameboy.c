@@ -2,10 +2,8 @@
 #include "z80gb.h"
 
 CPU cpu;
-
-void render();
-
-int main(void) {
+#undef main
+int main() {
 		
 	//The processor for this emulation instance
 	Sharp_LR35902 processor;
@@ -15,7 +13,7 @@ int main(void) {
 	/*
 	Memory map goes here
 	*/
-	uint8_t ram[0xFFFF] = {0};
+	uint8_t* ram = (uint8_t*) calloc(0xFFFF,1);
 	RAM = ram;	
 
 	//One clock cycle period, 4 of them is one NOP Instruction.
@@ -56,8 +54,9 @@ int main(void) {
 
 	//ram used by ppu
 	//note that these rams also exist within the cpu's ram buffer but are actually shadow copies of the actual ppu ram
-	uint8_t vram[0xFF] = {0};
-	uint8_t oam[0xFF] = {0};
+	//CURRENTLY NOT USED
+	//uint8_t vram[0xFF] = {0};
+	//uint8_t oam[0xFF] = {0};
 
 	//log
 	FILE* log = fopen("log/log","w+b");
@@ -73,11 +72,11 @@ int main(void) {
 	*/
 	//Interrupts Enable Register and each switch
 	#define IN_EN_REG *(RAM+0xFFFF)
-	#define VBLANK_SWITCH (IN_EN_REG & 0x01)
-	#define LCDC_SWITCH (IN_EN_REG & 0x02)
-	#define TIMER_SWITCH (IN_EN_REG & 0x04)
-	#define SERIAL_SWITCH (IN_EN_REG & 0x08)
-	#define BUTTON_SWITCH (IN_EN_REG & 0x10)
+	#define VBLANK_SWITCH (IN_EN_REG | 0x01)
+	#define LCDC_SWITCH (IN_EN_REG | 0x02)
+	#define TIMER_SWITCH (IN_EN_REG | 0x04)
+	#define SERIAL_SWITCH (IN_EN_REG | 0x08)
+	#define BUTTON_SWITCH (IN_EN_REG | 0x10)
 
 	//TODO, figure out what interrupts are on by default
 	//DISABLE all interrupts by default
@@ -94,8 +93,8 @@ int main(void) {
 	int debug = 0;	
 	
 	//Nanosecond time structures used for calculating high resolution time deltas
-	struct timespec currtime, lasttime;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &lasttime);
+	/*struct timespec currtime, lasttime;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &lasttime);*/
 
 	SDL_Event e;
 
@@ -105,10 +104,10 @@ int main(void) {
 	long dv_s = 0;
 
 	//buffer used for logging data
-	char buff[256];
+	char *buff = (char*) calloc(256,1);
 	//used for correcting from slow instructions
 	long time_stack = 0;
-	long misscnt;
+	long misscnt = 0;
 
 	//RENDERING & EXECUTION VARIABLES
 	//Execution loop cycle count, differs depending on whether vblanking or not
@@ -132,6 +131,8 @@ int main(void) {
 	//uint32_t palette[4] = {0xff9bbc0f, 0xff8bac0f, 0xff306230, 0xff0f380f};
 	//MONOCHROME
 	uint32_t palette[4] = {0xffffffff, 0xffb6b6b6, 0xff676767, 0xff000000};
+	//SpaceHaze
+	//uint32_t palette[4] = {0xfff8e3c4, 0xffcc3495, 0xff6b1fb1, 0xff0b0630};
 
 	while(1){
 		//EXECUTION LOOP
@@ -219,17 +220,20 @@ int main(void) {
 				uint8_t* bg_tile = LCDC_STATUS_TILE_DATA ? RAM+0x8000 : RAM+0x8800; 
 				
 				uint8_t pix, col;
-				//BG_PAL = 0xE1;	
-				
+				//Starting index in the background tile data
+				uint8_t* idx = &bg_tile[bg_map[SCX%8 + (SCY%8)*32]];				
+
 				//Note that the parent loop is counting in bytes not pixels
-				for(int u = 0; u < 160/4; u++){
-					for(int i = 0; i < 4; i++){
-						//Pixel value at this position
-						pix = (bg_tile[u+LINE*160] >> ((3 - i) * 2)) & 0x3;
-						//printf("pix %x",pix);
-						col = (BG_PAL >> (pix * 2)) & 0x3;
-						//Copy corresponding color into framebuffer at current pixel x + i.
-						framebuffer[LINE*160 + u*4 + i] = palette[col];
+				for(int u = 0; u < 160; u+=8){
+					for(int z = 0; z < 2; z++){
+						for(int i = 0; i < 4; i++){
+							//Pixel value at this position
+							pix = (*(RAM+LINE*160+u+z*2) >> ((3 - i) * 2)) & 0x3;
+							//printf("pix %x",pix);
+							col = (BG_PAL >> (pix * 2)) & 0x3;
+							//Copy corresponding color into framebuffer at current pixel x + i.
+							framebuffer[LINE*160 + u + z*4 + i] = palette[col];
+						}
 					}
 				}				
 			
@@ -287,10 +291,10 @@ int main(void) {
 			op = *(RAM + addr);
 				
 			//DELTA TIME AND CLOCK CALCULATIONS
-			clock_gettime(CLOCK_MONOTONIC_RAW, &lasttime);
+			//clock_gettime(CLOCK_MONOTONIC_RAW, &lasttime);
 			cycle = execute();	
-			clock_gettime(CLOCK_MONOTONIC_RAW, &currtime);
-			dt_s = currtime.tv_nsec - lasttime.tv_nsec;
+			//clock_gettime(CLOCK_MONOTONIC_RAW, &currtime);
+			//dt_s = currtime.tv_nsec - lasttime.tv_nsec;
 			//struct timespec t = {0, period * cycle - dt_s};
 			//nanosleep(&t ,NULL);
 			/*if(dt_s <= (long) period * cycle){
@@ -349,8 +353,7 @@ int main(void) {
 			if(IME && VBLANK_SWITCH)
 				PC = 0x40;
 
-			//SCALING FUNCTION
-			
+			//SCALING FUNCTION GOES HERE
 
 			//DISPLAY BUFFERED FRAME HERE
 			//Lock frame texture, allows framebuffer to be copied to texture.
@@ -366,22 +369,16 @@ int main(void) {
 		//dv_s = 0;
 	}
 	for(size_t i = 0; i < 0x10000; i++){
-		fputc(cpu->ram[i], dump); 
+		//fputc(cpu->ram[i], dump); 
 	} 
 	//CLEANUP
 	fclose(dump);
 	fclose(log);
 	free(framebuffer);
+	free(buff);
 	SDL_DestroyTexture(frame);
 	SDL_DestroyRenderer(ren);
 	SDL_DestroyWindow(win);
 	SDL_Quit();
 	return 0;
-}
-
-void render(){
-
-	
-
-
 }

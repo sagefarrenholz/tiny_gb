@@ -1,2 +1,15 @@
 bin
 comm
+.gitattributes
+.gitignore.swp
+.vs/
+Debug/
+inc/
+lib/
+log/
+resources/
+tiny_gb.ilk
+tiny_gb.sln
+tiny_gb.vcxproj
+tiny_gb.vcxproj.filters
+tiny_gb.vcxproj.user
