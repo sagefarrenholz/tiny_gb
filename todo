@@ -1,7 +1,26 @@
-implement graphics
-fix zero_reset on rot and shift ops
-add 16 cycle timings (hl) for prefixed opcodes
-fix bitwise operation coincidence bit
+Important:
+1| Create debugger that allows stepping and shows program state
+2| Implement graphics
+	Rip a background and sprite from a rom to use for testing
 
-not important:
-add in ability to switch palettes
+3| Add unit testing for each opcode / ability to individually test instructions
+4| Implement cpu timings (currently going as fast as it can)
+5| Determine correct intial state (ime, registers, etc)
+6| Fix zero_reset on rot and shift ops
+7| Add 16 cycle timings (hl) for prefixed opcodes
+8| Fix bitwise operation coincidence bit
+9| Implement di, stop, halt
+10| Interrupts
+11| Sound
+12| Config file
+
+Not as important:
+1| Clean up code
+2| General optimizations / Code review
+3| Structure the repo
+4| Prettify todo
+
+Future Goals:
+1| Add in ability to switch palettes
+2| Online Multiplayer
+3| Switch to pure OpenGL? Vulkan?

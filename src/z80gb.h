@@ -82,8 +82,7 @@ n Address		n Adress+1
 //LCDC STATUS Tile Data Select
 #define LCDC_STATUS_TILE_DATA (LCDC_STATUS & 0x10) >> 4
 //SET COMPARE BIT
-//TODO FIX THIS OPERATION, should not be an and operation. Will only set if bit is already active
-#define LCDC_STATUS_COINCIDENCE(C) (LCDC_STATUS &= (0x0FB | (C << 2)))
+#define LCDC_STATUS_COINCIDENCE(C) (LCDC_STATUS |= (0x0FB | (C << 2)))
 //SET MODE BITS
 #define LCDC_STATUS_MODE(M) LCDC_STATUS |= 0x3; LCDC_STATUS &= (0xFC | M)
 //GET MODE BITS
@@ -98,6 +97,7 @@ n Address		n Adress+1
 
 //LY - 0xFF44 - Current line to be rendered - Read only
 #define LINE (*(RAM+0xFF44))
+#define LY LINE
 
 //LYC - 0xFF45 - Used for comparing against LY
 #define LYC (*(RAM+0xFF45))
@@ -256,7 +256,7 @@ static inline void swp(uint8_t* dest){
 	HALF_RESET;
 	SUB_RESET;
 	CARRY_RESET;
-	uint8_t hn = *dest & 0xF0;
+	uint8_t hn = (*dest & 0xF0) >> 4;
 	*dest = (*dest << 4) & hn;
 
 }
@@ -341,8 +341,9 @@ static inline void sub(uint8_t* dest, uint8_t* src){
 }
 
 //sub 2 bytes
-//static inline void sub16(uint16_t* dest, uint16_t* src);
+//static inline void sub16(uint16_t* dest, uint16_t* src) not an instruction 
 
+//sub minus carry
 static inline void sdc(uint8_t* dest, uint8_t* src){
 	SUB_SET;
 	uint16_t diff = *dest - (*src + CARRY);
@@ -362,6 +363,11 @@ static inline void jp(uint16_t* dest) {
 static inline void jr(int8_t* offset){
 	//Address must be advanced by two to represent the relative jump from the beginning of the next instructions address.
 	PC += 2;
+	/*
+	Note. offset is a signed 8 bit integer. Twos compliment allows addition between signed and unsigned numbers. Result is expected. 
+	The signedness is just the representation of the underlying bits. The reason this works is because of overflow. Adding a negative
+	number to an unsigned number causes an overflow to the correct unsigned IF both integers are same size.
+	*/
 	PC += *offset;
 }
 

@@ -8,11 +8,13 @@
 
 #if defined(__APPLE__) || (__gnu_linux__)
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 #include <time.h>
 #include <sys/time.h>
 #elif defined(WIN32)
 #define _CRT_SECURE_NO_WARNINGS_
 #include <SDL2\SDL.h>
+#include <SDL22\SDL_ttf.h>
 #endif
 
 #define CLOCK_FREQ 4.194304
