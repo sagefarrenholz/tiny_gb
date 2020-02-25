@@ -2,6 +2,7 @@ bin
 comm
 .gitattributes
 .gitignore.swp
+.DS_Store
 .vs/
 Debug/
 inc/
