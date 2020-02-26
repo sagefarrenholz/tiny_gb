@@ -103,7 +103,7 @@ int main(int argc, char** argv) {
 	fclose(ROM);
 
 	//BOOTLOADER
-	FILE* BOOT = fopen("resources/boot", "rb");
+	FILE* BOOT = fopen("resources/boot.rom", "rb");
 	//load bootloader into ram
 	fread(RAM, 0xFF, 1, BOOT);
 	fclose(BOOT);

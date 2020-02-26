@@ -8,7 +8,6 @@ Debug/
 inc/
 lib/
 log/
-resources/
 tiny_gb.ilk
 tiny_gb.sln
 tiny_gb.vcxproj
