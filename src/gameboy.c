@@ -11,8 +11,10 @@ void blankBuffer(uint32_t* buff, uint64_t size);
 int main(int argc, char** argv) {
 
 	//Debugging variables
+	#ifdef DEBUG 
 	uint8_t dbg = 0, memdmp = 0, exelog = 0;
 	char* exelog_loc = NULL, *memdmp_loc = NULL;
+	#endif
 
 	//Rom File name
 	char* romname = NULL;
@@ -26,20 +28,26 @@ int main(int argc, char** argv) {
 			//Options
 			if(argv[i][0] == '-') {
 				switch(argv[i][1]) {
-					case 'd':
-						// debugger
-						dbg = 1;
-						break;
 					case 's':
 						// sets the scalar from default of 3
 						scalar = atoi(argv[i+1]);
 						break;
+					case 'v':
+						// prints version number
+						printf("0.0");
+						break;
 					case 'h':
 					case '-':
 						// help
-						printf("Sage's Tiny GB Emulator\nOptions:\n-h Prints this help blurb\n-s <num> Sets the graphics scaling \n");
+						printf("Sage's Tiny GB Emulator\nOptions:\n-h Prints this help blurb.\n-s <num> Sets the graphics scaling.\n-v Prints version number.");
 						return 0;
 						break; 
+					#ifdef DEBUG
+					case 'd':
+						// debugger
+						dbg = 1;
+						break;
+					
 					case 'm':
 						// memory dump
 						memdmp = 1;
@@ -50,6 +58,7 @@ int main(int argc, char** argv) {
 						exelog = 1;
 						exelog_loc = argv[i+1];
 						break;
+					#endif
 				}
 			} else {
 				//Rom name
@@ -94,7 +103,6 @@ int main(int argc, char** argv) {
 	uint64_t width = 160, height = 144;		
 	//Pitch is the row width in bytes of the buffer sent to the texture used to render the gameboy screen
 	uint64_t pitch = width * 4 * scalar;
-	
 
 	//ROM
 	FILE* ROM = fopen(romname,"rb");
@@ -103,7 +111,7 @@ int main(int argc, char** argv) {
 	fclose(ROM);
 
 	//BOOTLOADER
-	FILE* BOOT = fopen("resources/boot.rom", "rb");
+	FILE* BOOT = fopen("../resources/boot.rom", "rb");
 	//load bootloader into ram
 	fread(RAM, 0xFF, 1, BOOT);
 	fclose(BOOT);
@@ -123,39 +131,6 @@ int main(int argc, char** argv) {
 	//uint8_t vram[0xFF] = {0};
 	//uint8_t oam[0xFF] = {0};
 
-	// Execution log / trace
-	FILE* log;
-	if(exelog)
-		log = fopen(exelog_loc,"w+b");
-	// Memory dump
-	FILE* dump;
-	if(memdmp)
-		dump = fopen(memdmp_loc,"w+b");
-
-	/*
-
-	 [==========]	
-	  INTERRUPTS
-	 [==========]
-
-	*/
-	//Interrupts Enable Register, Interrupt checks, and each corresponding switch
-	#define IN_EN_REG *(RAM+0xFFFF)
-
-	//Interrupt checks
-	#define VBLANK_IN (IN_EN_REG & 0x01)
-	#define LCDC_IN (IN_EN_REG & 0x02)
-	#define TIMER_IN (IN_EN_REG & 0x04)
-	#define SERIAL_IN (IN_EN_REG & 0x08)
-	#define BUTTON_IN (IN_EN_REG & 0x10)
-
-	//Interrupt enable switches
-	#define VBLANK_SWITCH (IN_EN_REG | 0x01)
-	#define LCDC_SWITCH (IN_EN_REG | 0x02)
-	#define TIMER_SWITCH (IN_EN_REG | 0x04)
-	#define SERIAL_SWITCH (IN_EN_REG | 0x08)
-	#define BUTTON_SWITCH (IN_EN_REG | 0x10)
-
 	//TODO, figure out what interrupts are on by default
 	//DISABLE all interrupts by default
 	IN_EN_REG = 0x00;  	
@@ -170,7 +145,16 @@ int main(int argc, char** argv) {
 	SDL_CreateWindowAndRenderer(width * scalar, height * scalar, 0, &win, &ren);	
 	printf("%s", SDL_GetError());
 
-	
+	#ifdef DEBUG
+	// Execution log / trace
+	FILE* log;
+	if(exelog)
+		log = fopen(exelog_loc,"w+b");
+	// Memory dump
+	FILE* dump;
+	if(memdmp)
+		dump = fopen(memdmp_loc,"w+b");
+
 	//Debug variables
 	TTF_Font* debug_font;
 	SDL_Window* win2;
@@ -203,8 +187,7 @@ int main(int argc, char** argv) {
 	int wide, tall;
 	bound.x = 0;
 	bound.y = 0;
-
-	
+	#endif	
 
 	//Nanosecond time structures used for calculating high resolution time deltas
 	/*struct timespec currtime, lasttime;
@@ -250,20 +233,23 @@ int main(int argc, char** argv) {
 	//SpaceHaze
 	//uint32_t palette[4] = {0xfff8e3c4, 0xffcc3495, 0xff6b1fb1, 0xff0b0630};
 
- 	unsigned incer = 0;
-
 	while(1){
 		//EXECUTION LOOP
+		cyclecount = 0;
+		//LCDC_STATUS_MODE(0);
 		while(cyclecount < loop_count){
-
 			//Poll for events, ie button presses.
 			SDL_PollEvent(&e);
 			
 			//META INTERRUPTS
 				//QUIT TINY_GB
 				if(e.type == SDL_QUIT) {
-					sprintf(buff, "MISS PERCENTAGE: %f%%\nMISS COUNT: %li\n",(double) misscnt/cyclecount * 100.0, misscnt);
-					fputs(buff,log);
+					#ifdef DEBUG
+					if (exelog) {
+						sprintf(buff, "MISS PERCENTAGE: %f%%\nMISS COUNT: %li\n",(double) misscnt/cyclecount * 100.0, misscnt);
+						fputs(buff,log);
+					}
+					#endif
 					return 0;
 				}				
 
@@ -337,12 +323,11 @@ int main(int argc, char** argv) {
 				uint8_t* bg_map = LCDC_STATUS_BG_MAP ? RAM+0x9C00 : RAM+0x9800;
 				uint8_t* bg_tile = LCDC_STATUS_TILE_DATA ? RAM+0x8000 : RAM+0x8800; 
 				
-				uint8_t pix, col;
+				//uint8_t pix, col;
 				//Starting index in the background tile data
-				uint8_t* idx = &bg_tile[bg_map[SCX % 8 + (SCY % 8) * 32]];				
-
+				//uint8_t* idx = &bg_tile[bg_map[SCX % 8 + (SCY % 8) * 32]];				
 				//Note that the parent loop is counting in bytes not pixels
-				for(int u = 0; u < 160; u += 8){
+				/*for(int u = 0; u < 160; u += 8){
 					for(int z = 0; z < 2; z++){
 						for(int i = 0; i < 4; i++){
 							//Pixel value at this position
@@ -354,6 +339,13 @@ int main(int argc, char** argv) {
 						}
 					}
 				}				
+				*/
+				
+				for(int row = 0; row < 32; row++){
+					for (int col = 0; col < 32; col++){
+						tileRender(bg_tile + bg_map[col + row * 32], col * 8 + SCX, row * 8 + SCY, framebuffer, palette, scalar);	
+					}
+				}
 			
 				//SPRITE RENDERING
 				while(sprite_count > 0){
@@ -403,7 +395,9 @@ int main(int argc, char** argv) {
 			}
 
 			//HBLANK - MODE 0
-			else if(cyclecount >= 168 && LCDC_STATUS_MODE_GET == 3) {LCDC_STATUS_MODE(0);}
+			else if(cyclecount >= 168 && LCDC_STATUS_MODE_GET == 3) {
+				LCDC_STATUS_MODE(0);
+			}	
 			
 			addr = cpu->pc;
 			op = *(RAM + addr);
@@ -427,6 +421,7 @@ int main(int argc, char** argv) {
 					time_stack -= period * cycle - dt_s;
 			} else {*/
 				//misscnt++;
+			#ifdef DEBUG
 			if(exelog){
 				sprintf(buff, " \n**\nRegisters:\nBC 0x%x\nDE 0x%x\nHL 0x%x\n(HL) 0x%x\nA 0x%x\nSP 0x%x\n\nFlags:\nZero %u\nSubtract %u\nHalf-Carry %u\nCarry %u\n",
 								BC,
@@ -445,6 +440,7 @@ int main(int argc, char** argv) {
 				//}
 				preop = op;
 			}
+			#endif
 			cyclecount += cycle;
 		}
 		
@@ -457,11 +453,13 @@ int main(int argc, char** argv) {
 			loop_count = 456;
 
 			//Set coincidence bit for the scanline to be rendered. 
-			if(LYC == LINE) 
+			if(LYC == LINE) { 
 				LCDC_STATUS_COINCIDENCE(1);
-			else 
+			}
+			else { 
 				LCDC_STATUS_COINCIDENCE(0);
-
+			}
+	
 		//VBLANK, display buffered frame, and reset to top line
 		} else {
 			LINE = 0;
@@ -473,26 +471,18 @@ int main(int argc, char** argv) {
 			if(IME && VBLANK_IN)
 				PC = 0x40;
 			
-			//Blanking using memset
-			memset(framebuffer, 0, FRAMESIZE_BYTES);
-
-			//Just some testing of tileRender
-			/*for(int r = 0; r < 18; r++){
-				for(int col = 0; col < 20; col++){
-					tileRender(RAM + (16 * (r * 20 + col + incer / 20)), col * 8 + 8, r * 8 + 16, framebuffer, palette, scalar);
-					incer++;
-				}
-			}*/
-			
-			tileRenderLine(RAM + 0x0150, 8, 16, incer % 8, framebuffer, palette, scalar);
-			incer+=2;
+			tileRenderLine(RAM + 0x0150, 8, 16 + 10, PC % 8, framebuffer, palette, scalar);
 			
 			//DISPLAY BUFFERED FRAME HERE
-			SDL_RenderClear(ren);
+			//SDL_RenderClear(ren);
 			SDL_UpdateTexture(frame, NULL, (void*) framebuffer, pitch);
 			SDL_RenderCopy(ren, frame, NULL, NULL);
 			SDL_RenderPresent(ren);
 
+			//Blanking using memset
+			memset(framebuffer, 0, FRAMESIZE_BYTES);
+
+			#ifdef DEBUG
 			//Draw Debug window
 			if (dbg) {
 				//Create a texture of text
@@ -526,6 +516,7 @@ int main(int argc, char** argv) {
 				bound.y = 0;
 				SDL_RenderPresent(ren2);
 			}
+			#endif
 				
 		}
 		
@@ -535,20 +526,28 @@ int main(int argc, char** argv) {
 
 		//dv_s = 0;
 	}
+	//CLEANUP
+	#ifdef DEBUG
 	//mem dump
 	if(memdmp){
+		printf("Dumping memory...\n");
 		for(size_t i = 0; i < 0x10000; i++){
 			fputc(RAM[i], dump); 
 		}
+		printf("Done.\n");
 	} 
-	//CLEANUP
 	if(memdmp)
 		fclose(dump);
 	if(exelog)
 		fclose(log);
+	if(dbg){
+		TTF_CloseFont(debug_font);
+		SDL_DestroyRenderer(ren2);
+		SDL_DestroyWindow(win2);
+	}
+	#endif
 	free(framebuffer);
 	free(buff);
-        TTF_CloseFont(debug_font);
 	SDL_DestroyTexture(frame);
 	SDL_DestroyRenderer(ren);
 	SDL_DestroyWindow(win);
@@ -605,7 +604,7 @@ inline void tileRender(uint8_t* idx, unsigned x, unsigned y, uint32_t* buffer, u
 				for (int col = 0; col < scalar; col++){
 					// Sets each pixel in the scalar x scalar square to the tile color
 					/*
-					Essentially, what these nested loops do is go through the buffer and
+					What these nested loops do is go through the buffer and
 					scaling each pixel to a series of pixel (square shape, maybe add rectangular
 					scaling in the future) which has its own row and height dimensions defined
 					by the scalar.
@@ -627,23 +626,6 @@ inline void tileRender(uint8_t* idx, unsigned x, unsigned y, uint32_t* buffer, u
 inline void tileRenderLine(uint8_t* idx, unsigned x, unsigned y, unsigned line,  uint32_t* buffer, uint32_t* palette, uint8_t scalar) {
 	// Gameboy has a bitdepth of 4 so one byte contains 4 pixels.
 	// A tile is 8x8 so 16 bytes [ie, 0x..00 -> 0x..10] contain one tile (	divide by 4 because of the above statement )
-	
-	// TODO implement a more complex way of doing this, that is more performant and less memory intensive by filling the buffer while reading out pixels
-	// instead of using a temporary array.	
-	// The line renderer can definitely be optimized with some semi-complex algebra
-
-	uint32_t tile[64] = {0};
-	// Conversion to BGRA32 array
-	for (int i = 0; i < 16; i++){
-		// SHIFTING LOOP
-		for (int s = 0; s < 4; s++){
-			/*
-			The parent loop goes through each byte.
-			This child SHIFTING LOOP shifts the byte getting every 2 bit pixel out. The 0x3 AND operation zeroes any higher bits leftover.
-			*/
-			tile[i * 4 + s] = palette[0x3 & (idx[i] >> (6 - 2 * s))];
-		}
-	}
 
 	// If the tile is past the bottom bound, we can end rendering, if y or x is 0 it is also out of bounds above or to the left of the viewport, so break
 	// In other words, if any of these conditions are met the rest of the sprite is completely hidden
@@ -671,8 +653,10 @@ inline void tileRenderLine(uint8_t* idx, unsigned x, unsigned y, unsigned line, 
 				by the scalar.
 				*/
 				// If the tile contains line (it meets the checks with the return statement), then the row to render is line - (y - 16)
-				buffer[scalar * (x + c - 8) + 160 * (line - (y - 16)) * scalar * scalar + col + row * scalar * 160] = tile[c + 8 * (line - (y - 16))];	
-				// TODO MOVE SHIFTING LOOP / CONVERSION LOOP HERE
+				//buffer[scalar * (x + c - 8) + 160 * (line - (y - 16)) * scalar * scalar + col + row * scalar * 160] = tile[c + 8 * (line - (y - 16))];	
+				
+				// This is garbage unreadable code, clean up
+				buffer[scalar * (x + c - 8) + 160 * (line - (y - 16)) * scalar * scalar + col + row * scalar * 160] = palette[0x3 & (idx[c / 4 + 2 * (line - (y - 16))] >> (6 - 2 * (c % 4)))];	
 			}
 		}
 	}
@@ -683,7 +667,7 @@ inline void tileRenderLine(uint8_t* idx, unsigned x, unsigned y, unsigned line, 
 // Instruction unit tester, allows manual execution of instructions, prints the result of the registers
 // Instruction is a pointer to the instruction(s) to be executed, num is the amount of instruction executions to occur.
 void instTest(uint8_t* instruction, uint64_t num){
-
+	
 
 }
 

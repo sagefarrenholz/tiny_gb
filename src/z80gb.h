@@ -82,18 +82,18 @@ n Address		n Adress+1
 //LCDC STATUS Tile Data Select
 #define LCDC_STATUS_TILE_DATA (LCDC_STATUS & 0x10) >> 4
 //SET COMPARE BIT
-#define LCDC_STATUS_COINCIDENCE(C) (LCDC_STATUS |= (0x0FB | (C << 2)))
+#define LCDC_STATUS_COINCIDENCE(C) LCDC_STATUS |= 0x4; LCDC_STATUS &= (C << 2)
 //SET MODE BITS
 #define LCDC_STATUS_MODE(M) LCDC_STATUS |= 0x3; LCDC_STATUS &= (0xFC | M)
 //GET MODE BITS
 #define LCDC_STATUS_MODE_GET (LCDC_STATUS & 0x03)
 
 //BG PALETTE
-#define BG_PAL *(RAM+0xFF47)
+#define BG_PAL (*(RAM+0xFF47))
 
 //BG SCROLL REGISTERS
-#define SCX *(RAM+0xFF42)
-#define SCY *(RAM+0xFF43)
+#define SCX (*(RAM+0xFF42))
+#define SCY (*(RAM+0xFF43))
 
 //LY - 0xFF44 - Current line to be rendered - Read only
 #define LINE (*(RAM+0xFF44))
@@ -101,8 +101,6 @@ n Address		n Adress+1
 
 //LYC - 0xFF45 - Used for comparing against LY
 #define LYC (*(RAM+0xFF45))
-
-
 
 //DMA - 0xFF56 - Transfer memory chunk from XX00 - XX9F to FE00-FE9F (OAM MEMORY)
 #define DMA (*(RAM+0xFF56))
@@ -123,11 +121,27 @@ int execute();
 
 /*
 
- [==========]
+ [==========]	
   INTERRUPTS
  [==========]
- 
+
 */
+//Interrupts Enable Register, Interrupt checks, and each corresponding switch
+#define IN_EN_REG *(RAM+0xFFFF)
+
+//Interrupt checks
+#define VBLANK_IN (IN_EN_REG & 0x01)
+#define LCDC_IN (IN_EN_REG & 0x02)
+#define TIMER_IN (IN_EN_REG & 0x04)
+#define SERIAL_IN (IN_EN_REG & 0x08)
+#define BUTTON_IN (IN_EN_REG & 0x10)
+
+//Interrupt enable switches
+#define VBLANK_SWITCH (IN_EN_REG |= 0x01)
+#define LCDC_SWITCH (IN_EN_REG |= 0x02)
+#define TIMER_SWITCH (IN_EN_REG |= 0x04)
+#define SERIAL_SWITCH (IN_EN_REG |= 0x08)
+#define BUTTON_SWITCH (IN_EN_REG |= 0x10)
 
 //Switch IME ON, ime is master interrupt switch. 
 static inline void ei(){

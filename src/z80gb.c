@@ -9,7 +9,7 @@
 */
 
 
-int execute(){
+inline int execute(){
 
 	//OPERANDS
 	//n is a pointer to the byte following the opcode, nn a pointer to the two bytes following the opcode LSB, d is a pointer to the signed byte following the opcode
